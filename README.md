@@ -42,7 +42,7 @@ Install the core emulation binaries:
 ``chmod +x tcg.sh``
 
 # Start the emulation console
-``./tcg.sh`` or bash ``tcg.sh``
+``./tcg.sh`` or ``bash tcg.sh``
 
 # 🖥️ The Management Interface
 ### Powered by the Feather Network Console, the script provides:
