@@ -460,7 +460,7 @@ start_vm() {
             -m "$MEMORY" \
             -smp "$CPUS",cores="$CPUS",threads=1 \
             -cpu max \
-            -machine type=q35,accel=tcg,thread=multi \
+            -machine type=q35,accel=tcg -accel tcg,thread=multi /
             -drive "file=$IMG_FILE,format=qcow2,if=none,id=hd0,cache=writeback,aio=threads" \
             -device virtio-blk-pci,drive=hd0 \
             -drive "file=$SEED_FILE,format=raw,if=none,id=seed0" \
