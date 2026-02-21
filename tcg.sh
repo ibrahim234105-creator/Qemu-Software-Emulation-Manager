@@ -444,7 +444,7 @@ start_vm() {
         
         # Check if image file exists
         if [[ ! -f "$IMG_FILE" ]]; then
-            print_status "ERROR" "❌ VM image file not found: $IMG_FILE"
+            print_status ERROR" "❌ VM image file not found: $IMG_FILE"
             return 1
         fi
         
@@ -453,36 +453,41 @@ start_vm() {
             print_status "WARN" "⚠️  Seed file not found, recreating..."
             setup_vm_image
         fi
-        
-        # Pure QEMU command without KVM
+
+                # Optimized QEMU command for Software Emulation (TCG)
         local qemu_cmd=(
             qemu-system-x86_64 \
             -m "$MEMORY" \
-            -smp "$CPUS",threads=1 \
-            -cpu qemu64 \
-            -machine type=pc,accel=tcg \
-            -drive "file=$IMG_FILE,format=qcow2,if=virtio,cache=writeback" \
-            -drive "file=$SEED_FILE,format=raw,if=virtio" \
-            -device virtio-net-pci,netdev=n0 \
+            -smp "$CPUS",cores="$CPUS",threads=1 \
+            -cpu max \
+            -machine type=q35,accel=tcg,thread=multi \
+            -drive "file=$IMG_FILE,format=qcow2,if=none,id=hd0,cache=writeback,aio=threads" \
+            -device virtio-blk-pci,drive=hd0 \
+            -drive "file=$SEED_FILE,format=raw,if=none,id=seed0" \
+            -device virtio-blk-pci,drive=seed0 \
             -netdev "user,id=n0,hostfwd=tcp::$SSH_PORT-:22" \
+            -device virtio-net-pci,netdev=n0 \
             -boot order=c \
-            -no-reboot \
-            -nographic
+            -no-reboot
         )
 
         # Add port forwards if specified
         if [[ -n "$PORT_FORWARDS" ]]; then
+            local count=1
             IFS=',' read -ra forwards <<< "$PORT_FORWARDS"
             for forward in "${forwards[@]}"; do
                 IFS=':' read -r host_port guest_port <<< "$forward"
-                qemu_cmd+=(-device "virtio-net-pci,netdev=n${#qemu_cmd[@]}")
-                qemu_cmd+=(-netdev "user,id=n${#qemu_cmd[@]},hostfwd=tcp::$host_port-:$guest_port")
+                # Create a unique netdev and device for each port forward
+                qemu_cmd+=(-netdev "user,id=n$count,hostfwd=tcp::$host_port-:$guest_port")
+                qemu_cmd+=(-device "virtio-net-pci,netdev=n$count")
+                ((count++))
             done
         fi
 
         # Add GUI or console mode
         if [[ "$GUI_MODE" == true ]]; then
-            qemu_cmd+=(-vga virtio -display gtk,gl=on)
+            # Added virtio-tablet-pci for better mouse response in TCG
+            qemu_cmd+=(-vga virtio -display gtk,gl=on -device virtio-tablet-pci)
             print_status "INFO" "🖥️  Starting in GUI mode..."
         else
             qemu_cmd+=(-nographic -serial mon:stdio)
@@ -490,13 +495,15 @@ start_vm() {
             print_status "INFO" "🛑 Press Ctrl+A then X to exit QEMU console"
         fi
 
-        # Add performance enhancements for software emulation
+        # Performance, Entropy, and cleanup enhancements
         qemu_cmd+=(
             -device virtio-balloon-pci
             -object rng-random,filename=/dev/urandom,id=rng0
             -device virtio-rng-pci,rng=rng0
             -no-hpet
             -rtc base=utc,clock=host
+            -parallel none
+            -monitor none
         )
 
         print_status "INFO" "⚡ Starting QEMU in pure software emulation mode..."
