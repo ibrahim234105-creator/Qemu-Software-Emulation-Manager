@@ -457,20 +457,13 @@ start_vm() {
         # Optimized QEMU command for Software Emulation (TCG)
         local qemu_cmd=(
             qemu-system-x86_64 \
-            -m "$MEMORY" \
-            -smp "$CPUS",cores="$CPUS",threads=1 \
-            -cpu max \
-            -machine q35 \
-            -accel tcg,thread=multi \
-            -drive "file=$IMG_FILE,format=qcow2,if=none,id=hd0,cache=writeback,aio=threads" \
-            -device virtio-blk-pci,drive=hd0 \
-            -drive "file=$SEED_FILE,format=raw,if=none,id=seed0" \
-            -device virtio-blk-pci,drive=seed0 \
-            -netdev "user,id=n0,hostfwd=tcp::$SSH_PORT-:22" \
-            -device virtio-net-pci,netdev=n0 \
-            -boot order=c \
-            -no-reboot
-        )
+            -m $MEMORY \
+            -smp $CPUS \
+            -drive file=/vm/debian13/debian13.qcow2,format=qcow2 \
+            -drive file=/vm/debian13/seed.iso,format=raw \
+            -net nic \
+            -net user,hostfwd=tcp::2222-:22 \
+            -nographic &
 
         # Add port forwards if specified
         if [[ -n "$PORT_FORWARDS" ]]; then
